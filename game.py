@@ -62,11 +62,35 @@ class Game:
         self.show_hands: Dict[int, List[Card]] = {}
         self.dealer = 0
 
+    def prepare_round(self, dealer: Optional[int] = None):
+        """Reset tracked state so a fresh round (dealer and crib) can start."""
+        self.deck = Deck()
+        self.crib = []
+        self.starter = None
+        self.pegging_total = 0
+        self.pegging_cards = []
+        self.last_played_player = None
+        self.players_passed.clear()
+        self.last_card_bonus_awarded = False
+        self.show_hands = {}
+        self.phase = 'deal'
+        if dealer is None:
+            dealer = random.randrange(self.num_players)
+        self.dealer = dealer % self.num_players
+        self.current_player = self.dealer
+        for player in self.players:
+            player.hand = []
+
+    def reset_peg_state(self):
+        self.pegging_total = 0
+        self.pegging_cards = []
+        self.players_passed.clear()
+        self.last_card_bonus_awarded = False
+
     def deal_cards(self):
         cards_per_player = 6 if self.num_players == 2 else 5
         for player in self.players:
             player.hand = self.deck.deal(cards_per_player)
-        self.last_card_bonus_awarded = False
 
     def set_starter(self):
         self.starter = self.deck.deal(1)[0]
@@ -104,24 +128,24 @@ class Game:
         self.players_passed.clear()
         return card, points
 
-    def go(self, player_id: int) -> tuple[Optional[int], bool, bool, bool]:
+    def go(self, player_id: int) -> tuple[Optional[int], int, bool, bool]:
         self.players_passed.add(player_id)
         active_players = {pid for pid, player in enumerate(self.players) if len(player.hand) > 0}
         if not active_players:
             # Nothing left to play, move to show without awarding an extra point
             self.players_passed.clear()
-            return None, True, True, False
+            return None, 0, True, False
         if self.last_played_player is None:
-            return None, False, False, False
+            return None, 0, False, False
         if active_players.issubset(self.players_passed):
             total_before_reset = self.pegging_total
-            self.pegging_total = 0
-            self.pegging_cards = []
-            self.players_passed.clear()
-            self.last_card_bonus_awarded = False
-            award_last_card = total_before_reset != 31 and all(len(p.hand) == 0 for p in self.players)
-            return self.last_played_player, True, self.is_pegging_over(), award_last_card
-        return None, False, False, False
+            award_last_card = (
+                self.last_played_player is not None and total_before_reset != 31 and not self.last_card_bonus_awarded
+            )
+            points_awarded = 1 if award_last_card else 0
+            self.reset_peg_state()
+            return self.last_played_player, points_awarded, True, self.is_pegging_over()
+        return None, 0, False, False
 
     def calculate_pegging_points(self) -> int:
         points = 0

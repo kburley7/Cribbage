@@ -81,6 +81,12 @@ class CribbageClient:
             console.print(f"Player {data['player_id']} joined")
         elif msg_type == "game_started":
             console.print("Game started!")
+        elif msg_type == "round_started":
+            dealer = data.get("dealer")
+            console.print(data.get("message", "A new round is starting."))
+            if dealer is not None:
+                console.print(f"Dealer for this round: Player {dealer}")
+            self.display_instructions(force=True)
         elif msg_type == "deal":
             self.hand = data["hand"]
             # Store starter but don't display yet
